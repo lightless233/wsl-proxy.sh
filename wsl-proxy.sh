@@ -27,7 +27,7 @@ ipt() {
 
 require_iptables() {
   command -v iptables >/dev/null || { echo 'iptables is required' >&2; exit 1; }
-  if (( EUID != 0 )) && ! sudo -n true 2>/dev/null; then
+  if (( EUID != 0 )); then
     sudo -v || exit 1
   fi
 }
