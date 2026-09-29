@@ -138,9 +138,10 @@ start_rules() {
   done
   ipt -t nat -A "$TCP_CHAIN" -p tcp -j REDIRECT --to-ports "$REDSOCKS_PORT"
 
-  ipt -t nat -A "$DNS_CHAIN" -j DNAT --to-destination "${HOST_IP}:${CLASH_DNS_PORT}"
+  ipt -t nat -A "$DNS_CHAIN" -p udp -j DNAT --to-destination "${HOST_IP}:${CLASH_DNS_PORT}"
   ipt -t nat -A "$SNAT_CHAIN" -p udp -d "$HOST_IP" --dport "$CLASH_DNS_PORT" -j MASQUERADE
   if [[ "$DNS_TCP" == 1 ]]; then
+    ipt -t nat -A "$DNS_CHAIN" -p tcp -j DNAT --to-destination "${HOST_IP}:${CLASH_DNS_PORT}"
     ipt -t nat -A "$SNAT_CHAIN" -p tcp -d "$HOST_IP" --dport "$CLASH_DNS_PORT" -j MASQUERADE
   fi
 
@@ -172,7 +173,8 @@ status_rules() {
   fi
   if (( active == expected )) &&
      ipt -t nat -C "$TCP_CHAIN" -p tcp -j REDIRECT --to-ports "$REDSOCKS_PORT" 2>/dev/null &&
-     ipt -t nat -C "$DNS_CHAIN" -j DNAT --to-destination "${HOST_IP}:${CLASH_DNS_PORT}" 2>/dev/null; then
+     ipt -t nat -C "$DNS_CHAIN" -p udp -j DNAT --to-destination "${HOST_IP}:${CLASH_DNS_PORT}" 2>/dev/null &&
+     { [[ "$DNS_TCP" == 0 ]] || ipt -t nat -C "$DNS_CHAIN" -p tcp -j DNAT --to-destination "${HOST_IP}:${CLASH_DNS_PORT}" 2>/dev/null; }; then
     echo 'active'
     result=0
   elif (( active == 0 )); then
