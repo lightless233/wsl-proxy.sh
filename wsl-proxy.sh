@@ -48,36 +48,6 @@ remove_chain() {
   fi
 }
 
-remove_legacy_rules() {
-  # One-time migration from the original script. Delete its chain only when
-  # no other rule still references it.
-  local ip port rules
-  rules=$(ipt -t nat -S)
-  if [[ "$rules" != *REDSOCKS* &&
-        "$rules" != *":1053"* &&
-        "$rules" != *":${CLASH_DNS_PORT}"* &&
-        "$rules" != *"--dport 1053"* &&
-        "$rules" != *"--dport ${CLASH_DNS_PORT}"* ]]; then
-    return 0
-  fi
-  remove_all nat OUTPUT -p tcp -j REDSOCKS
-  remove_all nat PREROUTING -p tcp -j REDSOCKS
-  for ip in 172.19.96.1 "$HOST_IP"; do
-    for port in 1053 "$CLASH_DNS_PORT"; do
-      remove_all nat OUTPUT -p udp --dport 53 -j DNAT --to-destination "${ip}:${port}"
-      remove_all nat OUTPUT -p tcp --dport 53 -j DNAT --to-destination "${ip}:${port}"
-      remove_all nat POSTROUTING -p udp -d "$ip" --dport "$port" -j MASQUERADE
-      remove_all nat POSTROUTING -p tcp -d "$ip" --dport "$port" -j MASQUERADE
-    done
-  done
-  rules=$(ipt -t nat -S)
-  if [[ "$rules" == *"-N REDSOCKS"* &&
-        "$rules" != *" -j REDSOCKS"* &&
-        "$rules" != *" -g REDSOCKS"* ]]; then
-    remove_chain REDSOCKS
-  fi
-}
-
 stop_rules() {
   remove_all nat OUTPUT -p tcp -j "$TCP_CHAIN"
   remove_all nat OUTPUT -p udp --dport 53 -j "$DNS_CHAIN"
@@ -87,7 +57,6 @@ stop_rules() {
   remove_chain "$TCP_CHAIN"
   remove_chain "$DNS_CHAIN"
   remove_chain "$SNAT_CHAIN"
-  remove_legacy_rules
 }
 
 validate_config() {
@@ -184,14 +153,8 @@ status_rules() {
     echo 'active'
     result=0
   elif (( active == 0 )); then
-    if ipt -t nat -C OUTPUT -p tcp -j REDSOCKS 2>/dev/null ||
-       ipt -t nat -C OUTPUT -p udp --dport 53 -j DNAT --to-destination '172.19.96.1:1053' 2>/dev/null; then
-      echo 'legacy rules active; run start or stop to migrate' >&2
-      result=1
-    else
-      echo 'stopped'
-      result=3
-    fi
+    echo 'stopped'
+    result=3
   else
     echo 'partial or configuration changed' >&2
     result=1
