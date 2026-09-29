@@ -1,0 +1,16 @@
+[Unit]
+Description=WSL transparent TCP proxy and Clash DNS forwarding
+Wants=network-online.target
+Requires=redsocks.service
+After=network-online.target redsocks.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+EnvironmentFile=-/etc/default/wsl-proxy
+ExecStart=/usr/local/sbin/wsl-proxy start
+ExecStop=/usr/local/sbin/wsl-proxy stop
+ExecReload=/usr/local/sbin/wsl-proxy restart
+
+[Install]
+WantedBy=multi-user.target
