@@ -49,8 +49,8 @@ remove_chain() {
 }
 
 remove_legacy_rules() {
-  # One-time migration from the original script. Leave its chain intact so
-  # another caller of REDSOCKS is not disturbed.
+  # One-time migration from the original script. Delete its chain only when
+  # no other rule still references it.
   local ip port rules
   rules=$(ipt -t nat -S)
   if [[ "$rules" != *REDSOCKS* &&
@@ -70,6 +70,12 @@ remove_legacy_rules() {
       remove_all nat POSTROUTING -p tcp -d "$ip" --dport "$port" -j MASQUERADE
     done
   done
+  rules=$(ipt -t nat -S)
+  if [[ "$rules" == *"-N REDSOCKS"* &&
+        "$rules" != *" -j REDSOCKS"* &&
+        "$rules" != *" -g REDSOCKS"* ]]; then
+    remove_chain REDSOCKS
+  fi
 }
 
 stop_rules() {
